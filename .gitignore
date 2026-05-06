@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# Local SQLite paper-fill DBs (never commit live or test data)
+*.db
+*.db-shm
+*.db-wal
+
+# Environment / secrets (defense in depth — Railway provides these as env vars)
+.env
+.env.*
+*.pem
+*_private_key*
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
