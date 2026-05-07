@@ -134,6 +134,13 @@ def _get_prop_settings(game, prop_type="points"):
 # Override with PAPER_MODE_DEFAULT=false in env if you really mean to ship live.
 paper_mode = (os.environ.get("PAPER_MODE_DEFAULT", "true").lower() != "false")
 
+# When 0 (or "false"/"no"), the auto-subscribe loop and manual subscribe
+# endpoint will NOT call boltodds_ls_feed.subscribe / boltodds_pbp_feed.subscribe.
+# This prevents prod from holding Bolt's 1-concurrent WS slot per feed when
+# the LS phase resolver isn't actually being used in trading logic.
+# Default ON so existing local dev / phase-compare workflows still work.
+ENABLE_BOLT_FEEDS = os.environ.get("BOLT_LS_ENABLED", "1").lower() not in ("0", "false", "no", "off")
+
 # Global smart mode
 global_smart_mode = False
 smart_refresh_thread = None
@@ -2949,8 +2956,9 @@ def _auto_subscribe_live_games_loop():
                     # Already subscribed this game — make sure stub is in `games`
                     pass
                 else:
-                    boltodds_ls_feed.subscribe(bolt_key)
-                    boltodds_pbp_feed.subscribe(bolt_key)
+                    if ENABLE_BOLT_FEEDS:
+                        boltodds_ls_feed.subscribe(bolt_key)
+                        boltodds_pbp_feed.subscribe(bolt_key)
                     nba_feed.register_bolt_key(espn_gid, bolt_key)
                     nba_cdn_id = None
                     try:
@@ -3353,7 +3361,10 @@ def api_v2_force_subscribe():
     if not bolt_key:
         return jsonify({"ok": False, "error": "provide ?bolt_key=... or ?home=...&away=..."}), 400
 
-    # Subscribe both feeds
+    # Subscribe both feeds (manual endpoint — always honors request, but logs
+    # a warning if BOLT_LS_ENABLED=0 so the operator knows the global flag is off)
+    if not ENABLE_BOLT_FEEDS:
+        log.warning("Manual /api/v2/bolt_subscribe called while BOLT_LS_ENABLED=0 — subscribing anyway by explicit request")
     try:
         boltodds_ls_feed.subscribe(bolt_key)
         boltodds_pbp_feed.subscribe(bolt_key)
